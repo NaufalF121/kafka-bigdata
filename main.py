@@ -1,27 +1,21 @@
-import websocket
+import requests
+import time
 import os
 
-def on_message(ws, message):
-    print(message)
 
-def on_error(ws, error):
-    print(error)
 
-def on_close(ws):
-    print("### closed ###")
+url = 'https://api.coincap.io/v2/assets'
 
-def on_open(ws):
-    ws.send('{"type":"subscribe","symbol":"AAPL"}')
-    ws.send('{"type":"subscribe","symbol":"AMZN"}')
-    ws.send('{"type":"subscribe","symbol":"BINANCE:BTCUSDT"}')
-    ws.send('{"type":"subscribe","symbol":"IC MARKETS:1"}')
+params = {
+    'search' : 'BTC',
+    'limit': 1
+}
 
-if __name__ == "__main__":
-    websocket.enableTrace(True)
-    api = os.getenv('API_KEY')
-    ws = websocket.WebSocketApp("wss://ws.finnhub.io?token="+api,
-                              on_message = on_message,
-                              on_error = on_error,
-                              on_close = on_close)
-    ws.on_open = on_open
-    ws.run_forever()
+while True: 
+
+    r = requests.get(url, params=params)
+    data = r.json()
+    print(data['data'][0]['name'])
+    print(data['data'][0]['priceUsd'])
+    time.sleep(31)
+    
