@@ -18,8 +18,8 @@ def on_open(ws):
 
 if __name__ == "__main__":
     websocket.enableTrace(True)
-    os.getenv('API_KEY')
-    ws = websocket.WebSocketApp("wss://ws.finnhub.io?token=cpac339r01qgo8bhasf0cpac339r01qgo8bhasfg",
+    api = os.getenv('API_KEY')
+    ws = websocket.WebSocketApp("wss://ws.finnhub.io?token="+api,
                               on_message = on_message,
                               on_error = on_error,
                               on_close = on_close)
