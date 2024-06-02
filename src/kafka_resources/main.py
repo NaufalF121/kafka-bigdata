@@ -8,8 +8,9 @@ from time import sleep
 from kafka import KafkaProducer
 import sys, types
 
-API_KEY = os.getenv("API_KEY")
-finnhub_client = finnhub.Client(api_key=API_KEY)
+FINNHUB_API_KEY = os.getenv("FINNHUB_API_KEY")
+finnhub_client = finnhub.Client(api_key=FINNHUB_API_KEY)
+
 url = 'https://api.coincap.io/v2/assets'
 m = types.ModuleType('kafka.vendor.six.moves', 'Mock module')
 setattr(m, 'range', range)
