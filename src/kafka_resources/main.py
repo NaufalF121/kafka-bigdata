@@ -1,5 +1,3 @@
-import os
-import finnhub
 import json as json
 import time
 import requests
@@ -7,11 +5,10 @@ from concurrent.futures import ThreadPoolExecutor
 from time import sleep
 from kafka import KafkaProducer
 import sys, types
+import finnhub
+import os
 
-FINNHUB_API_KEY = os.getenv("FINNHUB_API_KEY")
-finnhub_client = finnhub.Client(api_key=FINNHUB_API_KEY)
 
-url = 'https://api.coincap.io/v2/assets'
 m = types.ModuleType('kafka.vendor.six.moves', 'Mock module')
 setattr(m, 'range', range)
 sys.modules['kafka.vendor.six.moves'] = m
@@ -20,20 +17,14 @@ producer = KafkaProducer(
     bootstrap_servers=['localhost:9092']
     
 )
-params = {
-    'search' : 'BTC',
-    'limit': 1
-}
-
+TOPIC = "test"
+API_KEY = os.getenv("API_KEY")
+finnhub_client = finnhub.Client(api_key=API_KEY)
 while True: 
 
-    r = requests.get(url, params=params)
-    data = r.json()
-    print("Cryptocurrency")
-    print(data['data'][0]['name'])
-    print(data['data'][0]['priceUsd'])
-    producer.send('test', json.dumps(data['data'][0]).encode('utf-8'))
-    # print("Stock")
-    # print(finnhub_client.quote('PBCRF'))
+    print("Stock")
+    print(finnhub_client.quote('PBCRF'))
+    producer.send(TOPIC, json.dumps(finnhub_client.quote('PBCRF')).encode('utf-8'))
     time.sleep(31)
-    
+
+producer.flush()
