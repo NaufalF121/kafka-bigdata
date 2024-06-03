@@ -24,7 +24,9 @@ while True:
 
     print("Stock")
     print(finnhub_client.quote('PBCRF'))
-    producer.send(TOPIC, json.dumps(finnhub_client.quote('PBCRF')).encode('utf-8'))
+    message = finnhub_client.quote('PBCRF')
+    message['type'] = 'stock'
+    producer.send(TOPIC, json.dumps(message).encode('utf-8'))
     time.sleep(86400)
 
 producer.flush()
