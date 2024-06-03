@@ -1,30 +1,41 @@
-import json as json
-import time
-import requests
-from concurrent.futures import ThreadPoolExecutor
-from time import sleep
 from kafka import KafkaProducer
-import sys, types
-import finnhub
+import requests
+import json
 import os
+from dotenv import load_dotenv
 
 
-m = types.ModuleType('kafka.vendor.six.moves', 'Mock module')
-setattr(m, 'range', range)
-sys.modules['kafka.vendor.six.moves'] = m
+TOPIC_NAME = 'test'
+KAFKA_SERVER = 'localhost:9092'
 
-producer = KafkaProducer(
-    bootstrap_servers=['localhost:9092']
-    
-)
-TOPIC = "test"
-API_KEY = os.getenv("API_KEY")
-finnhub_client = finnhub.Client(api_key=API_KEY)
-while True: 
+producer = KafkaProducer(bootstrap_servers=KAFKA_SERVER)
 
-    print("Stock")
-    print(finnhub_client.quote('PBCRF'))
-    producer.send(TOPIC, json.dumps(finnhub_client.quote('PBCRF')).encode('utf-8'))
-    time.sleep(86400)
+load_dotenv()
+api_url = os.getenv('ALPHA_API_KEY')
+
+
+def get_feedback():
+  # Send GET request with potential filter parameters
+  response = requests.get(api_url)
+
+  if response.status_code == 200:
+    data = response.json()  # Assuming JSON response
+    return data
+  else:
+    print(f"Error retrieving feedback: {response.status_code}")
+    return None
+
+# Get feedback data (assuming successful retrieval)
+feedback_data = get_feedback()
+
+if feedback_data:
+  # Prepare and send data to Kafka if retrieved successfully
+  payload = json.dumps(feedback_data)
+  producer.send(TOPIC_NAME, payload.encode('utf-8'))
+else:
+  print("No feedback data retrieved")
 
 producer.flush()
+
+# producer.send(TOPIC_NAME, b'${"name": "John Doe", "age": 30}')
+# producer.flush()
