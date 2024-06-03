@@ -32,7 +32,9 @@ while True:
     print("Cryptocurrency")
     print(data['data'][0]['name'])
     print(data['data'][0]['priceUsd'])
-    producer.send(TOPIC, json.dumps(data['data'][0]).encode('utf-8'))
+    dataWithType = data['data'][0]
+    dataWithType['type'] = 'cryptocurrency'
+    producer.send(TOPIC, json.dumps(dataWithType).encode('utf-8'))
     time.sleep(31)
 
 producer.flush()
