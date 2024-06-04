@@ -3,7 +3,7 @@ import json
 import logging
 
 # Configuration
-TOPIC = "bitcoin"
+TOPIC = "Etherium"
 BOOTSTRAP_SERVERS = 'localhost:9092'
 GROUP_ID = 'mygroup'
 
