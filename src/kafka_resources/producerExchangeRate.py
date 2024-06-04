@@ -1,4 +1,3 @@
-# https://api.frankfurter.app/latest?amount=1&from=USD&to=IDR
 from Producer import ProducerFrankfurter
 
 if __name__ == "__main__":
