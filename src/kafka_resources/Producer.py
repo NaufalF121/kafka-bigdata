@@ -61,7 +61,6 @@ class ProducerCoinDesk:
     def get_data(self):
         try:
             r = requests.get(self.url, params=self.params)
-            print(f"{self.url}?{self.params}")
             r.raise_for_status()
             return r.json()
         except requests.exceptions.RequestException as e:
