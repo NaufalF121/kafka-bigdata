@@ -80,17 +80,21 @@ class ProducerCoinDesk:
         self.producer.produce(self.topic, message)
         self.producer.flush()
 
+    def job(self):
+        data = self.get_data()
+        if data is not None:
+            message = self.process_data(data)
+            self.send_to_kafka(message)
+            logging.info(f"Message sent to Kafka: {message}")
+
     def run(self):
-        while True: 
-            current_time = datetime.datetime.now()
-            if current_time.second == self.refresh_time: # Run the job every 60 seconds each refresh_time
-                data = self.get_data()
-                if data is not None:
-                    message = self.process_data(data)
-                    self.send_to_kafka(message)
-                time.sleep(60 - current_time.second)
-            else:
-                time.sleep(0.1)
+        self.job()
+
+        schedule.every(1).minutes.do(self.job)
+
+        while True:
+            schedule.run_pending()
+            time.sleep(1)
 
 class ProducerFrankfurter:
     """
@@ -159,11 +163,12 @@ class ProducerFrankfurter:
         if data is not None:
             message = self.process_data(data)
             self.send_to_kafka(message)
+            logging.info(f"Message sent to Kafka: {message}")
 
     def run(self):
         self.job()
 
-        schedule.every().day.at("00:00").do(self.job)
+        schedule.every(1).minutes.do(self.job)
 
         while True:
             schedule.run_pending()
