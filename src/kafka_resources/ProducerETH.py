@@ -1,14 +1,14 @@
 from Producer import ProducerCoinDesk
 
 if __name__ == "__main__":
-    bitcoin_producer = ProducerCoinDesk(
+    etherium_producer = ProducerCoinDesk(
         url='https://api.coincap.io/v2/assets',
         params={
-            'search' : 'BTC',
+            'search' : 'ETH',
             'limit': 1
             },
-        topic='bitcoin',
+        topic='etherium',
         bootstrap_servers='localhost:9092'
     )
 
-    bitcoin_producer.run()
+    etherium_producer.run()
