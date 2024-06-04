@@ -1,10 +1,9 @@
 from pyspark.sql import SparkSession
-from pyspark.sql.functions import from_json, col, window, from_unixtime
-from pyspark.sql.types import StructType, StructField, StringType, DoubleType
+from pyspark.sql.functions import from_json, col, date_trunc
+from pyspark.sql.types import StructType, StructField, StringType, DoubleType, TimestampType
 
 spark = SparkSession.builder \
     .appName("KafkaDataAggregation") \
-    .master("local[*]") \
     .config("spark.jars.packages", "org.apache.spark:spark-sql-kafka-0-10_2.12:3.0.1") \
     .config("spark.sql.streaming.schemaInference", True) \
     .config("spark.sql.streaming.forceDeleteTempCheckpointLocation", True) \
@@ -23,7 +22,7 @@ crypto_schema = StructType([
     StructField("priceUsd", StringType()),
     StructField("changePercent24Hr", StringType()),
     StructField("vwap24Hr", StringType()),
-    StructField("timestamp", StringType())
+    StructField("timestamp", TimestampType())
 ])
 
 crypto_df = spark \
@@ -35,15 +34,15 @@ crypto_df = spark \
     .selectExpr("CAST(value AS STRING)") \
     .select(from_json(col("value"), crypto_schema).alias("crypto")) \
     .select("crypto.*") \
-    .withColumn("timestamp", from_unixtime(col("timestamp")).cast("timestamp"))
-
+    .withWatermark("timestamp", "1 minute")
 
 exchange_schema = StructType([
     StructField("amount", DoubleType()),
     StructField("base", StringType()),
     StructField("date", StringType()),
     StructField("rates", StringType()),
-    StructField("timestamp", StringType())
+    StructField("type", StringType()),
+    StructField("timestamp", TimestampType())
 ])
 
 exchange_df = spark \
@@ -55,38 +54,27 @@ exchange_df = spark \
     .selectExpr("CAST(value AS STRING)") \
     .select(from_json(col("value"), exchange_schema).alias("exchange")) \
     .select("exchange.*") \
-    .withColumn("timestamp", from_unixtime(col("timestamp")).cast("timestamp"))
+    .withWatermark("timestamp", "1 minute")
 
-exchange_schema = StructType([
-    StructField("amount", DoubleType()),
-    StructField("base", StringType()),
-    StructField("date", StringType()),
-    StructField("rates", DoubleType()),
-    StructField("timestamp", StringType())
-])
+exchange_df = exchange_df.withColumn("rates", from_json(col("rates"), StructType([StructField("IDR", DoubleType())]))["IDR"])
 
-crypto_df = crypto_df.withWatermark("timestamp", "1 minutes").alias("crypto")
-exchange_df = exchange_df.withWatermark("timestamp", "1 minutes").alias("exchange")
+crypto_df = crypto_df.withColumn("timestamp", date_trunc("minute", "timestamp"))
+exchange_df = exchange_df.withColumn("timestamp", date_trunc("minute", "timestamp"))
 
-joined_df = crypto_df.alias("crypto").join(
-    exchange_df.alias("exchange"),
-    on=[col("crypto.timestamp") == col("exchange.timestamp")],
-    how="leftOuter"
-)
+agg_df = crypto_df.join(exchange_df, "timestamp")
 
-windowed_df = joined_df.groupBy(
-    window(col("crypto.timestamp"), "1 minutes"),
-    col("crypto.id")
-).agg({
-    "priceUsd": "avg",
-    "volumeUsd24Hr": "sum",
-    "rates": "avg"
-})
+agg_df = agg_df.select("timestamp", "priceUsd", "supply", "marketCapUsd", "rates")
 
-query = windowed_df \
-    .writeStream \
-    .outputMode("append") \
+agg_df = agg_df.withColumnRenamed("priceUsd", "price_usd")
+agg_df = agg_df.withColumnRenamed("supply", "supply")
+agg_df = agg_df.withColumnRenamed("marketCapUsd", "market_cap_usd")
+agg_df = agg_df.withColumnRenamed("rates", "exchange_rate")
+
+agg_df.writeStream \
     .format("console") \
-    .start()
+    .outputMode("append") \
+    .start() \
+    .awaitTermination()
 
-query.awaitTermination()
+
+# TODO: Write the data storing into Postgres
