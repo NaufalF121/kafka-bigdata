@@ -1,7 +1,0 @@
-how to run :
-1. Run docker compose
-docker compose up -d
-
-http://localhost:9021/ - kafka control center
-
-2. Run each producer on kafka_resources folder
