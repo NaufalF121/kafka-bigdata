@@ -29,9 +29,9 @@ class Connection:
             self.cursor.close()
             self.connection.close()
 
-    def execute(self, query):
+    def execute(self, query, data):
         try:
-            self.cursor.execute(query)
+            self.cursor.execute(query, data)
             self.connection.commit()
         except Error as e:
             print(f"Error while executing query: {e}")

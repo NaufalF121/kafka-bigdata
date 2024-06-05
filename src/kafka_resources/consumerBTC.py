@@ -8,7 +8,10 @@ import os
 TOPIC = "bitcoin"
 BOOTSTRAP_SERVERS = 'localhost:9092'
 GROUP_ID = 'mygroup'
-QUERY = ""
+QUERY = """
+INSERT INTO crypto.cryptobtc (timeid, supply,maxsupply,marketcapusd,volumeusd24hr,changepercent24hr,vwap24hr,price) 
+VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+"""
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -32,7 +35,8 @@ def consume_message(consumer,conn):
         try:
             message = json.loads(msg.value().decode('utf-8'))
             logging.info(message)
-            conn.execute(QUERY)
+            data = (message['timestamp'], message['supply'], message['maxSupply'], message['marketCapUsd'], message['volumeUsd24Hr'], message['changePercent24Hr'], message['vwap24Hr'], message['priceUsd'])
+            conn.execute(QUERY,data)
             
 
         except json.JSONDecodeError:
