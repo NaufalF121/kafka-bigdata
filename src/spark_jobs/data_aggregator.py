@@ -1,10 +1,39 @@
 from pyspark.sql import SparkSession
 from pyspark.sql.functions import from_json, col, date_trunc
 from pyspark.sql.types import StructType, StructField, StringType, DoubleType, TimestampType
+from cassandra.cluster import Cluster
+from cassandra.auth import PlainTextAuthProvider
+
+import logging
+
+logging.basicConfig(level=logging.INFO)
+
+def migrate_keyspace(keyspace_name):
+    auth_provider = PlainTextAuthProvider(username='cassandra', password='cassandra')
+    cluster = Cluster(['127.0.0.1'], auth_provider=auth_provider)
+    session = cluster.connect()
+
+    rows = session.execute("SELECT keyspace_name FROM system_schema.keyspaces")
+    if keyspace_name not in [row[0] for row in rows]:
+        session.execute(f"CREATE KEYSPACE {keyspace_name} WITH replication = {{ 'class': 'SimpleStrategy', 'replication_factor' : 3 }}")
+
+    session.shutdown()
+    cluster.shutdown()
+
+def create_table(table_name, keyspace_name):
+    auth_provider = PlainTextAuthProvider(username='cassandra', password='cassandra')
+    cluster = Cluster(['127.0.0.1'], auth_provider=auth_provider)
+    session = cluster.connect(keyspace_name)
+
+    session.execute(f"CREATE TABLE IF NOT EXISTS {table_name} (timestamp TIMESTAMP PRIMARY KEY, price_usd DOUBLE, supply DOUBLE, market_cap_usd DOUBLE, exchange_rate DOUBLE)")
+
+    session.shutdown()
+    cluster.shutdown()
 
 spark = SparkSession.builder \
     .appName("KafkaDataAggregation") \
-    .config("spark.jars.packages", "org.apache.spark:spark-sql-kafka-0-10_2.12:3.0.1") \
+    .config("spark.jars.packages", "com.datastax.spark:spark-cassandra-connector_2.12:3.5.0,org.apache.spark:spark-sql-kafka-0-10_2.12:3.0.1") \
+    .config("spark.cassandra.output.consistency.level", "ONE") \
     .config("spark.sql.streaming.schemaInference", True) \
     .config("spark.sql.streaming.forceDeleteTempCheckpointLocation", True) \
     .config("spark.streaming.stopGracefullyOnShutdown", True) \
@@ -70,11 +99,23 @@ agg_df = agg_df.withColumnRenamed("supply", "supply")
 agg_df = agg_df.withColumnRenamed("marketCapUsd", "market_cap_usd")
 agg_df = agg_df.withColumnRenamed("rates", "exchange_rate")
 
+def write_to_cassandra(df, epoch_id):
+    if not df.rdd.isEmpty():
+        df.write \
+            .format("org.apache.spark.sql.cassandra") \
+            .options(table="bitcoin_data", keyspace="crypto") \
+            .mode("append") \
+            .save()
+        logging.info(f"Data written to Cassandra for epoch_id: {epoch_id}")
+    
+    else:
+        logging.info(f"DataFrame is empty for epoch_id: {epoch_id}")
+
+migrate_keyspace("crypto")
+create_table("bitcoin_data", "crypto")
+
 agg_df.writeStream \
-    .format("console") \
     .outputMode("append") \
+    .foreachBatch(write_to_cassandra) \
     .start() \
     .awaitTermination()
-
-
-# TODO: Write the data storing into Postgres
