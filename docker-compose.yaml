@@ -37,6 +37,10 @@ services:
       KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
       KAFKA_JMX_PORT: 9101
       KAFKA_JMX_HOSTNAME: localhost
+      KAFKA_LOG_RETENTION_HOURS: 1  # Retention time set to 1 hour
+      KAFKA_LOG_RETENTION_BYTES: 1073741824  # Retention size set to 1 GB
+      KAFKA_LOG_SEGMENT_BYTES: 1073741824  # Segment size set to 1 GB
+      KAFKA_LOG_RETENTION_CHECK_INTERVAL_MS: 300000  # Check retention every 5 minutes
     healthcheck:
       test: [ "CMD", "bash", "-c", 'nc -z localhost 9092' ]
       interval: 10s
@@ -45,33 +49,22 @@ services:
     networks:
       - kafka-network
 
-  postgres:
-    image: postgres:latest
-    environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: postgres
+  cassandra:
+    image: cassandra:latest
     ports:
-      - "5432:5432"
+      - "9042:9042"
+    environment:
+      CASSANDRA_CLUSTER_NAME: MyCluster
+      CASSANDRA_ENDPOINT_SNITCH: GossipingPropertyFileSnitch
+      CASSANDRA_USER: cassandra
+      CASSANDRA_PASSWORD: cassandra
     healthcheck:
-      test: ["CMD", "pg_isready", "-U", "postgres"]
+      test: ["CMD", "cqlsh", "-e", "describe cluster"]
       interval: 10s
       timeout: 5s
       retries: 5
     networks:
       - kafka-network
-    
-  postgres-admin:
-    image: dpage/pgadmin4
-    environment:
-      PGADMIN_DEFAULT_EMAIL: example@gmail.com
-      PGADMIN_DEFAULT_PASSWORD: admin
-    ports:
-      - "5050:80"
-    networks:
-      - kafka-network
-    depends_on:
-      - postgres
 
   kafka-control-center:
     image: confluentinc/cp-enterprise-control-center:7.4.0
