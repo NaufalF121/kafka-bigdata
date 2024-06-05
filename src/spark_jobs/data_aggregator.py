@@ -1,5 +1,6 @@
 from pyspark.sql import SparkSession
-from pyspark.sql.functions import from_json, col, date_trunc
+from pyspark.sql.functions import from_json, col, date_trunc, udf
+import uuid
 from pyspark.sql.types import StructType, StructField, StringType, DoubleType, TimestampType
 from cassandra.cluster import Cluster
 from cassandra.auth import PlainTextAuthProvider
@@ -15,7 +16,9 @@ def migrate_keyspace(keyspace_name):
 
     rows = session.execute("SELECT keyspace_name FROM system_schema.keyspaces")
     if keyspace_name not in [row[0] for row in rows]:
-        session.execute(f"CREATE KEYSPACE {keyspace_name} WITH replication = {{ 'class': 'SimpleStrategy', 'replication_factor' : 3 }}")
+        session.execute(f"""
+            CREATE KEYSPACE {keyspace_name} WITH replication = {{ 'class': 'SimpleStrategy', 'replication_factor' : 3 }}
+        """)
 
     session.shutdown()
     cluster.shutdown()
@@ -25,7 +28,17 @@ def create_table(table_name, keyspace_name):
     cluster = Cluster(['127.0.0.1'], auth_provider=auth_provider)
     session = cluster.connect(keyspace_name)
 
-    session.execute(f"CREATE TABLE IF NOT EXISTS {table_name} (timestamp TIMESTAMP PRIMARY KEY, price_usd DOUBLE, supply DOUBLE, market_cap_usd DOUBLE, exchange_rate DOUBLE)")
+    session.execute(f"""
+        CREATE TABLE IF NOT EXISTS {table_name} (
+            timestamp TIMESTAMP,
+            id UUID,
+            price_usd DOUBLE,
+            supply DOUBLE,
+            market_cap_usd DOUBLE,
+            exchange_rate DOUBLE,
+            PRIMARY KEY ((timestamp), id)
+        ) WITH CLUSTERING ORDER BY (id ASC)
+    """)
 
     session.shutdown()
     cluster.shutdown()
@@ -99,6 +112,9 @@ agg_df = agg_df.withColumnRenamed("supply", "supply")
 agg_df = agg_df.withColumnRenamed("marketCapUsd", "market_cap_usd")
 agg_df = agg_df.withColumnRenamed("rates", "exchange_rate")
 
+uuidUdf= udf(lambda : str(uuid.uuid4()), StringType())
+agg_df = agg_df.withColumn("id", uuidUdf())
+
 def write_to_cassandra(df, epoch_id):
     if not df.rdd.isEmpty():
         df.write \
@@ -117,5 +133,6 @@ create_table("bitcoin_data", "crypto")
 agg_df.writeStream \
     .outputMode("append") \
     .foreachBatch(write_to_cassandra) \
+    .trigger(processingTime="10 seconds") \
     .start() \
     .awaitTermination()
