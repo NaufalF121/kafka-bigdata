@@ -12,3 +12,8 @@ producer-exchange-rate:
 spark-aggregator:
 	@echo "Running spark job for Data Aggregation"
 	@python ./src/spark_jobs/data_aggregator.py
+
+# Run Streamlit Dashboard
+streamlit-dashboard:
+	@echo "Running Streamlit Dashboard"
+	@streamlit run ./src/dashboard.py

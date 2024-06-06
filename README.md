@@ -15,6 +15,9 @@
         `make producer-btc`
         `make producer-exchange-rate`
 
-3. Run spark job to aggregrate data from kafka and write to postgres
+3. Run spark job to aggregrate data from kafka and write to cassandra
     
         `make spark-aggregator`
+
+4. Run the dashboard
+        `make streamlit-dashboard`
